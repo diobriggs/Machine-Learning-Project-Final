@@ -37,12 +37,12 @@ def train_and_evaluate_model(train_data, train_labels, test_data, n_classes):
     return test_predictions
 
 # Main processing loop for each dataset
-def process_datasets(results_folder):
+def process_datasets(datasets_folder):
     for i in range(1, 6):
         # Construct file paths
-        train_data_file = os.path.join(results_folder, f"TrainData{i}.txt")
-        train_label_file = os.path.join(results_folder, f"TrainLabel{i}.txt")
-        test_data_file = os.path.join(results_folder, f"TestData{i}.txt")
+        train_data_file = os.path.join(datasets_folder, f"TrainData{i}.txt")
+        train_label_file = os.path.join(datasets_folder, f"TrainLabel{i}.txt")
+        test_data_file = os.path.join(datasets_folder, f"TestData{i}.txt")
 
         # Set delimiters for each dataset
         if i == 3:
