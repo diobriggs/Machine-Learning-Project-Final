@@ -58,10 +58,10 @@ print(confusion_matrix(train_labels, train_predictions))
 
 # Implement Grid Search to find the best hyperparameters
 param_grid = {
-    'clf__n_estimators': [100, 150, 200],     # Slightly increase the range of estimators
-    'clf__max_depth': [7, 10, 12],            # Keep tree depths shallow to avoid overfitting
-    'clf__min_samples_split': [10, 15, 20],   # Test different splits for better regularization
-    'clf__min_samples_leaf': [5, 7, 10],      # Test minimum samples per leaf
+    'clf__n_estimators': [50, 100],     # Slightly increase the range of estimators
+    'clf__max_depth': [10, 20, 30],            # Keep tree depths shallow to avoid overfitting
+    'clf__min_samples_split': [5, 10],   # Test different splits for better regularization
+    'clf__min_samples_leaf': [2, 4],      # Test minimum samples per leaf
     'clf__max_features': ['sqrt', 'log2']     # Keep max_features limited
 }
 

@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
@@ -8,6 +7,8 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 import tensorflow as tf
+from tensorflow.keras.layers import Input
+
 
 # Load datasets using np.loadtxt
 train_data = np.loadtxt('datasets/TrainData4.txt')
@@ -16,8 +17,6 @@ test_data = np.loadtxt('datasets/TestData4.txt')
 
 # Adjust labels to be in the range [0, 8] (i.e., subtract 1 from the labels)
 train_labels = train_labels - 1
-# If there are test labels, adjust them similarly
-# test_labels = test_labels - 1  # Uncomment if you have test labels
 
 # Replace missing values (1e+99) with NaN
 train_data[train_data == 1.00000000000000e+99] = np.nan
@@ -36,24 +35,19 @@ scaler = StandardScaler()
 train_data_scaled = scaler.fit_transform(train_data_imputed)
 test_data_scaled = scaler.transform(test_data_imputed)
 
-# Apply PCA for feature selection (adjust the number of components as needed)
-pca = PCA(n_components=50)  # You can experiment with different numbers of components
-train_data_pca = pca.fit_transform(train_data_scaled)
-test_data_pca = pca.transform(test_data_scaled)
-
 # Use Stratified K-Fold Cross-Validation to evaluate the model
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 cv_scores = []
 
-for train_index, val_index in skf.split(train_data_pca, train_labels):
-    X_train_cv, X_val_cv = train_data_pca[train_index], train_data_pca[val_index]
+for train_index, val_index in skf.split(train_data_scaled, train_labels):
+    X_train_cv, X_val_cv = train_data_scaled[train_index], train_data_scaled[val_index]
     y_train_cv, y_val_cv = train_labels[train_index], train_labels[val_index]
 
     # Define the model with L2 regularization on the Dense layers
     model_cv = Sequential()
-    model_cv.add(Dense(128, input_dim=X_train_cv.shape[1], activation='relu',
-                       kernel_regularizer=tf.keras.regularizers.l2(0.01)))  # L2 regularization
-    model_cv.add(Dropout(0.2))  # Dropout layer to avoid overfitting
+    model_cv.add(Input(shape=(X_train_cv.shape[1],)))  # Use Input layer instead of input_dim
+    model_cv.add(Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))  # L2 regularization
+    model_cv.add(Dropout(0.3))  # Dropout layer to avoid overfitting
     model_cv.add(Dense(64, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))  # L2 regularization
     model_cv.add(Dense(9, activation='softmax'))  # 9 output classes (0-8)
     model_cv.compile(loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=['accuracy'])
@@ -61,7 +55,7 @@ for train_index, val_index in skf.split(train_data_pca, train_labels):
     # Manual Early Stopping
     best_val_loss = np.inf
     epochs_no_improve = 0
-    patience = 10  # Number of epochs with no improvement after which to stop training
+    patience = 5  # Number of epochs with no improvement after which to stop training
     best_weights = None
 
     for epoch in range(50):  # Maximum number of epochs
@@ -101,9 +95,9 @@ print("Mean cross-validation score:", np.mean(cv_scores))
 
 # Final model for predicting test data
 final_model = Sequential()
-final_model.add(Dense(128, input_dim=train_data_pca.shape[1], activation='relu',
-                      kernel_regularizer=tf.keras.regularizers.l2(0.01)))  # L2 regularization
-final_model.add(Dropout(0.2))  # Dropout layer to avoid overfitting
+final_model.add(Input(shape=(train_data_scaled.shape[1],)))  # Use Input layer instead of input_dim
+final_model.add(Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))  # L2 regularization
+final_model.add(Dropout(0.3))  # Dropout layer to avoid overfitting
 final_model.add(Dense(64, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)))  # L2 regularization
 final_model.add(Dense(9, activation='softmax'))  # 9 output classes (0-8)
 final_model.compile(loss='sparse_categorical_crossentropy', optimizer=Adam(), metrics=['accuracy'])
@@ -115,8 +109,8 @@ patience = 10
 best_weights = None
 
 for epoch in range(50):
-    history = final_model.fit(train_data_pca, train_labels, epochs=1, batch_size=32,
-                              verbose=0, validation_data=(train_data_pca, train_labels))
+    history = final_model.fit(train_data_scaled, train_labels, epochs=1, batch_size=32,
+                              verbose=0, validation_data=(train_data_scaled, train_labels))
 
     val_loss = history.history['val_loss'][0]
 
@@ -135,7 +129,7 @@ for epoch in range(50):
 final_model.set_weights(best_weights)
 
 # Predict on the test dataset
-test_predictions = final_model.predict(test_data_pca)
+test_predictions = final_model.predict(test_data_scaled)
 test_pred_classes = np.argmax(test_predictions, axis=1)
 
 test_pred_classes_shifted = test_pred_classes + 1
@@ -144,7 +138,7 @@ test_pred_classes_shifted = test_pred_classes + 1
 np.savetxt('results/BriggsClassification4.txt', test_pred_classes_shifted, fmt='%d')
 
 # Evaluate the final model on the full training data
-y_pred = final_model.predict(train_data_pca)
+y_pred = final_model.predict(train_data_scaled)
 y_pred_classes = np.argmax(y_pred, axis=1)
 
 # Print evaluation metrics for the final model

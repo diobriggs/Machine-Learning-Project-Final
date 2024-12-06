@@ -1,71 +1,88 @@
-import numpy as np
-from sklearn.impute import SimpleImputer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
-from imblearn.over_sampling import SMOTE  # Import SMOTE
 import os
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
+from sklearn.impute import SimpleImputer
 
 # Load data
 train_data = np.loadtxt('datasets/TrainData5.txt')
 train_labels = np.loadtxt('datasets/TrainLabel5.txt')
 test_data = np.loadtxt('datasets/TestData5.txt')
 
-# Replace the missing values (1.00000000000000e+99) with NaN for easier processing
-missing_value = 1.0e+99
-train_data[train_data == missing_value] = np.nan
-test_data[test_data == missing_value] = np.nan
+# Replace 1.00000000000000e+99 with NaN to identify missing values
+train_data = np.where(train_data == 1.00000000000000e+99, np.nan, train_data)
+test_data = np.where(test_data == 1.00000000000000e+99, np.nan, test_data)
 
-# Impute missing values with the mean of each feature
-imputer = SimpleImputer(strategy='mean')
-train_data = imputer.fit_transform(train_data)
-test_data = imputer.transform(test_data)
+# Fill missing values with the median of each column
+imputer = SimpleImputer(strategy='median')
+train_data_imputed = imputer.fit_transform(train_data)
+test_data_imputed = imputer.transform(test_data)
 
-# Use SMOTE to balance the training dataset
-smote = SMOTE(random_state=42)
-train_data_smote, train_labels_smote = smote.fit_resample(train_data, train_labels)
+# Initialize the Random Forest Classifier with regularization parameters
+rf_clf = RandomForestClassifier(
+    n_estimators=75,              # Number of trees
+    random_state=42,               # For reproducibility
+    max_depth=10,                  # Limit tree depth (regularization)
+    min_samples_split=10,           # Minimum samples required to split an internal node
+    min_samples_leaf=2,            # Minimum samples required at a leaf node
+    max_features='sqrt',
+    class_weight='balanced',
+    oob_score=True
+)
 
-# Initialize Random Forest classifier
-clf = RandomForestClassifier(random_state=42)
+# Initialize StratifiedKFold for cross-validation
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-# Perform 5-fold cross-validation to evaluate the model
-cv_scores = cross_val_score(clf, train_data_smote, train_labels_smote, cv=5, scoring='accuracy')
-print(f"Cross-validation Accuracy: {np.mean(cv_scores):.4f} ± {np.std(cv_scores):.4f}")
+# Lists to store metrics for each fold
+accuracies = []
+precisions = []
+recalls = []
+f1_scores = []
 
-# Train the classifier on the full training dataset (after SMOTE)
-clf.fit(train_data_smote, train_labels_smote)
+# Stratified K-Fold Cross Validation
+for train_index, val_index in skf.split(train_data_imputed, train_labels):
+    X_train, X_val = train_data_imputed[train_index], train_data_imputed[val_index]
+    y_train, y_val = train_labels[train_index], train_labels[val_index]
 
-# Predict the test data
-test_predictions = clf.predict(test_data)
+    # Fit the model
+    rf_clf.fit(X_train, y_train)
 
-# Save the predicted test labels to a text file
+    # Predict on the validation set
+    y_pred = rf_clf.predict(X_val)
+
+    # Calculate Accuracy
+    accuracy = accuracy_score(y_val, y_pred)
+    accuracies.append(accuracy)
+
+    # Calculate Precision, Recall, and F1-Score
+    precision, recall, f1, _ = precision_recall_fscore_support(y_val, y_pred, average='weighted', zero_division=0)
+    precisions.append(precision)
+    recalls.append(recall)
+    f1_scores.append(f1)
+
+# Print the evaluation metrics
+print(f"Stratified K-Fold Cross-Validation Results:")
+print(f"Accuracy: {np.mean(accuracies):.4f} ± {np.std(accuracies):.4f}")
+print(f"Precision: {np.mean(precisions):.4f} ± {np.std(precisions):.4f}")
+print(f"Recall: {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
+print(f"F1-Score: {np.mean(f1_scores):.4f} ± {np.std(f1_scores):.4f}")
+
+# Fit the model on the entire training data and calculate training accuracy
+rf_clf.fit(train_data_imputed, train_labels)
+train_data_pred = rf_clf.predict(train_data_imputed)
+train_accuracy = accuracy_score(train_labels, train_data_pred)
+
+print(f"Training Accuracy on the entire dataset: {train_accuracy:.4f}")
+
+# Predict on the test set
+y_test_pred = rf_clf.predict(test_data_imputed)
+
+# Create results folder if it doesn't exist
 os.makedirs('results', exist_ok=True)
-np.savetxt('results/BriggsClassification5.txt', test_predictions, fmt='%d')
 
-# Evaluate model performance using additional metrics
-# Use train-test split for detailed evaluation (optional)
-X_train, X_valid, y_train, y_valid = train_test_split(train_data_smote, train_labels_smote, test_size=0.2, random_state=42)
+# Save the predicted test labels to a file
+np.savetxt('results/BriggsClassification5.txt', y_test_pred, fmt='%d')
 
-# Fit the model on the training split
-clf.fit(X_train, y_train)
-
-# Predictions on validation set
-y_pred = clf.predict(X_valid)
-
-# Compute evaluation metrics
-accuracy = accuracy_score(y_valid, y_pred)
-precision = precision_score(y_valid, y_pred, average='weighted')
-recall = recall_score(y_valid, y_pred, average='weighted')
-f1 = f1_score(y_valid, y_pred, average='weighted')
-conf_matrix = confusion_matrix(y_valid, y_pred)
-class_report = classification_report(y_valid, y_pred)
-
-# Print evaluation metrics
-print(f"Validation Accuracy: {accuracy:.4f}")
-print(f"Precision: {precision:.4f}")
-print(f"Recall: {recall:.4f}")
-print(f"F1 Score: {f1:.4f}")
-print("\nConfusion Matrix:")
-print(conf_matrix)
-print("\nClassification Report:")
-print(class_report)
+print("Predicted test labels saved to 'results/BriggsClassification5.txt'")

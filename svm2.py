@@ -1,5 +1,6 @@
 import numpy as np
-import pandas as pd
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.impute import SimpleImputer
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -19,20 +20,23 @@ missing_value = 1.0e+99
 train_data[train_data == missing_value] = np.nan
 test_data[test_data == missing_value] = np.nan
 
+
 # Impute missing values with the mean of each feature
 imputer = SimpleImputer(strategy='mean')
 train_data = imputer.fit_transform(train_data)
 test_data = imputer.transform(test_data)
+
 
 # Standardize the data
 scaler = StandardScaler()
 train_data = scaler.fit_transform(train_data)
 test_data = scaler.transform(test_data)
 
+# Feature selection using SelectKBest
+feature_selector = SelectKBest(score_func=f_classif)
+
 # Apply PCA to reduce dimensionality
-pca = PCA(n_components=0.95)  # Retain 95% of the variance
-train_data_pca = pca.fit_transform(train_data)
-test_data_pca = pca.transform(test_data)
+pca = PCA(n_components=0.95)  # Retain 80% of the variance
 
 # Use Stratified K-Fold Cross-Validation to evaluate the model
 skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -40,19 +44,23 @@ skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 # SVM with balanced class weights to handle imbalance
 svm = SVC(class_weight='balanced')
 
+variance_filter = VarianceThreshold(threshold=0)
+
 # Set up the SVM model pipeline with hyperparameter tuning using GridSearchCV
 pipeline = Pipeline([
+    ('variance_filter', variance_filter),
     ('scaler', StandardScaler()),
+    ('feature_selection', SelectKBest(score_func=f_classif)),
     ('pca', PCA(n_components=0.95)),
     ('svm', SVC(kernel='rbf', class_weight='balanced'))  # Use RBF kernel and balance classes
 ])
 
 # Hyperparameters to tune - expanded grid for regularization and kernel parameters
 param_grid = {
+    'feature_selection__k': [500, 750, 1000],  # Select top k features
     'svm__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000],  # A range of values for C
     'svm__gamma': [0.0001, 0.001, 0.01, 0.1, 1]  # A range of values for gamma
 }
-
 
 # GridSearchCV for hyperparameter tuning with cross-validation
 grid_search = GridSearchCV(pipeline, param_grid, cv=skf, scoring='accuracy', n_jobs=-1, verbose=2)
