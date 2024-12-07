@@ -1,6 +1,4 @@
-import os
 import numpy as np
-import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
@@ -28,8 +26,7 @@ rf_clf = RandomForestClassifier(
     min_samples_split=10,
     min_samples_leaf=2,
     max_features='sqrt',
-    class_weight='balanced',
-    oob_score=True
+    class_weight='balanced'
 )
 
 # Cross validation
@@ -82,5 +79,3 @@ y_test_pred = rf_clf.predict(testing_data_imputed)
 
 # Save the predicted labels
 np.savetxt('results/BriggsClassification5.txt', y_test_pred, fmt='%d')
-
-

@@ -50,13 +50,6 @@ pipeline.fit(training_data_imputed, training_labels)
 training_predictions = pipeline.predict(training_data_imputed)
 
 
-print("Training Accuracy:", accuracy_score(training_labels, training_predictions))
-print("\nClassification Report:")
-print(classification_report(training_labels, training_predictions))
-print("\nConfusion Matrix:")
-print(confusion_matrix(training_labels, training_predictions))
-
-
 param_grid = {
     'clf__n_estimators': [25, 50, 100],
     'clf__max_depth': [5, 7, 10],
