@@ -7,87 +7,87 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
 # Load datasets
-train_data = np.loadtxt('datasets/TrainData3.txt')
-train_labels = np.loadtxt('datasets/TrainLabel3.txt')
-test_data = np.loadtxt('datasets/TestData3.txt', delimiter=',')
+training_data = np.loadtxt('datasets/TrainData3.txt')
+training_labels = np.loadtxt('datasets/TrainLabel3.txt')
+testing_data = np.loadtxt('datasets/TestData3.txt', delimiter=',')
 
-# Replace missing values (1.00000000000000e+99) with the mean of the feature column
+# Find and replace all missing values in the dataset with column mean
 imputer = SimpleImputer(missing_values=1.00000000000000e+99, strategy='mean')
-train_data_imputed = imputer.fit_transform(train_data)
-test_data_imputed = imputer.transform(test_data)
+training_data_imputed = imputer.fit_transform(training_data)
+testing_data_imputed = imputer.transform(testing_data)
 
 # Standardize the data
 scaler = StandardScaler()
-train_data_scaled = scaler.fit_transform(train_data_imputed)
-test_data_scaled = scaler.transform(test_data_imputed)
+train_data_scaled = scaler.fit_transform(training_data_imputed)
+test_data_scaled = scaler.transform(testing_data_imputed)
 
-# Adjust RandomForestClassifier parameters for stronger regularization
+
 clf = RandomForestClassifier(
-    n_estimators=150,          # Slightly increased number of trees
-    max_depth=12,              # Limit the depth of the trees for better generalization
-    min_samples_split=20,      # Increase the minimum samples per split
-    min_samples_leaf=10,        # Increase the minimum samples per leaf
-    max_features='sqrt',       # Use a subset of features for each split
+    n_estimators=150,
+    max_depth=12,
+    min_samples_split=20,
+    min_samples_leaf=10,
+    max_features='sqrt',
     random_state=42,
-    bootstrap=True             # Use bootstrapping to improve generalization
+    bootstrap=True
 )
 
-# Create a pipeline to standardize data and train the model
+# Create a pipeline
 pipeline = Pipeline([
     ('scaler', StandardScaler()),
     ('clf', clf)
 ])
 
-# Perform cross-validation to check generalization
-cv_scores = cross_val_score(pipeline, train_data_imputed, train_labels, cv=5)
+# Cross validation
+cv_scores = cross_val_score(pipeline, training_data_imputed, training_labels, cv=5)
 print(f"Cross-Validation Scores: {cv_scores}")
 print(f"Mean Cross-Validation Score: {np.mean(cv_scores)}")
 
-# Train the RandomForest with the training data using the pipeline
-pipeline.fit(train_data_imputed, train_labels)
+
+pipeline.fit(training_data_imputed, training_labels)
 
 # Evaluate the model on the training data
-train_predictions = pipeline.predict(train_data_imputed)
+training_predictions = pipeline.predict(training_data_imputed)
 
-# Print evaluation metrics
-print("Training Accuracy:", accuracy_score(train_labels, train_predictions))
+
+print("Training Accuracy:", accuracy_score(training_labels, training_predictions))
 print("\nClassification Report:")
-print(classification_report(train_labels, train_predictions))
+print(classification_report(training_labels, training_predictions))
 print("\nConfusion Matrix:")
-print(confusion_matrix(train_labels, train_predictions))
+print(confusion_matrix(training_labels, training_predictions))
 
-# Implement Grid Search to find the best hyperparameters
+
 param_grid = {
-    'clf__n_estimators': [50, 100],     # Slightly increase the range of estimators
-    'clf__max_depth': [10, 20, 30],            # Keep tree depths shallow to avoid overfitting
-    'clf__min_samples_split': [5, 10],   # Test different splits for better regularization
-    'clf__min_samples_leaf': [2, 4],      # Test minimum samples per leaf
-    'clf__max_features': ['sqrt', 'log2']     # Keep max_features limited
+    'clf__n_estimators': [25, 50, 100],
+    'clf__max_depth': [5, 7, 10],
+    'clf__min_samples_split': [5, 10],
+    'clf__min_samples_leaf': [2, 4],
+    'clf__max_features': ['sqrt', 'log2']
 }
 
 grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
-grid_search.fit(train_data_imputed, train_labels)
+grid_search.fit(training_data_imputed, training_labels)
 
-# Print the best hyperparameters found by Grid Search
+
 print(f"Best Hyperparameters: {grid_search.best_params_}")
 print(f"Best Cross-Validation Score: {grid_search.best_score_}")
 
-# Re-train the model using the best parameters found
+# Retrain model with best pipeline
 best_pipeline = grid_search.best_estimator_
-best_pipeline.fit(train_data_imputed, train_labels)
+best_pipeline.fit(training_data_imputed, training_labels)
 
 # Predict on the training data with the best model
-train_predictions_best = best_pipeline.predict(train_data_imputed)
+training_predictions_best = best_pipeline.predict(training_data_imputed)
 
-# Print evaluation metrics for the best model
-print("\nBest Model Training Accuracy:", accuracy_score(train_labels, train_predictions_best))
+# Evaluation metrics
+print("\nBest Model Training Accuracy:", accuracy_score(training_labels, training_predictions_best))
 print("\nBest Model Classification Report:")
-print(classification_report(train_labels, train_predictions_best))
+print(classification_report(training_labels, training_predictions_best))
 print("\nBest Model Confusion Matrix:")
-print(confusion_matrix(train_labels, train_predictions_best))
+print(confusion_matrix(training_labels, training_predictions_best))
 
-# Use the best model to predict on the test data
-predicted_labels_best = best_pipeline.predict(test_data_imputed)
+
+best_predicted_labels = best_pipeline.predict(testing_data_imputed)
 
 # Save the predicted labels from the best model to BriggsClassification3.txt
-np.savetxt('results/BriggsClassification3.txt', predicted_labels_best, fmt='%d')
+np.savetxt('results/BriggsClassification3.txt', best_predicted_labels, fmt='%d')

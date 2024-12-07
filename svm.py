@@ -11,30 +11,30 @@ import os
 # Loading in the dataset
 training_data = np.loadtxt('datasets/TrainData1.txt')
 training_labels = np.loadtxt('datasets/TrainLabel1.txt', dtype=int)
-test_data = np.loadtxt('datasets/TestData1.txt')
+testing_data = np.loadtxt('datasets/TestData1.txt')
 
 # Find and replace all missing values in the dataset with NaN
 missing_value = 1.0e+99
 training_data[training_data == missing_value] = np.nan
-test_data[test_data == missing_value] = np.nan
+testing_data[testing_data == missing_value] = np.nan
 
 # Impute all the NaN values with the mean of each feature.
 imputer = SimpleImputer(strategy='mean')
 train_data = imputer.fit_transform(training_data)
-test_data = imputer.transform(test_data)
+testing_data = imputer.transform(testing_data)
 
 # Standardize the data
 scaler = StandardScaler()
 train_data = scaler.fit_transform(train_data)
-test_data = scaler.transform(test_data)
+testing_data = scaler.transform(testing_data)
 
 # Apply PCA while keeping 95% of variance
 pca = PCA(n_components=0.95)
 train_data_pca = pca.fit_transform(train_data)
-test_data_pca = pca.transform(test_data)
+test_data_pca = pca.transform(testing_data)
 
-# Cross validation to make sure the model is performing well.
-skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+# Cross validation
+stratified_kf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 
 # SVM with balanced class weights.
 svm = SVC(class_weight='balanced')
@@ -53,7 +53,7 @@ param_grid = {
 }
 
 # GridSearchCV for hyperparameter tuning with cross-validation
-grid_search = GridSearchCV(pipeline, param_grid, cv=skf, scoring='accuracy', n_jobs=-1, verbose=2)
+grid_search = GridSearchCV(pipeline, param_grid, cv=stratified_kf, scoring='accuracy', n_jobs=-1, verbose=2)
 grid_search.fit(train_data, training_labels)
 
 # Best model after tuning
@@ -70,12 +70,12 @@ print("Confusion Matrix:")
 print(confusion_matrix(training_labels, train_predictions))
 
 # Evaluate using cross-validation accuracy score
-cv_scores = cross_val_score(best_model, train_data, training_labels, cv=skf)
+cv_scores = cross_val_score(best_model, train_data, training_labels, cv=stratified_kf)
 print("\nCross-Validation Accuracy Scores:", cv_scores)
 print("Mean Cross-Validation Accuracy:", np.mean(cv_scores))
 
 # Predict on the test data
-test_predictions = best_model.predict(test_data)
+test_predictions = best_model.predict(testing_data)
 
 # Save the predictions to the results folder
 output_folder = 'results'

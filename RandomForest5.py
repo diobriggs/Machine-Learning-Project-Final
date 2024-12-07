@@ -6,45 +6,45 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from sklearn.impute import SimpleImputer
 
-# Load data
-train_data = np.loadtxt('datasets/TrainData5.txt')
-train_labels = np.loadtxt('datasets/TrainLabel5.txt')
-test_data = np.loadtxt('datasets/TestData5.txt')
+# Loading the data
+training_data = np.loadtxt('datasets/TrainData5.txt')
+training_labels = np.loadtxt('datasets/TrainLabel5.txt')
+testing_data = np.loadtxt('datasets/TestData5.txt')
 
-# Replace 1.00000000000000e+99 with NaN to identify missing values
-train_data = np.where(train_data == 1.00000000000000e+99, np.nan, train_data)
-test_data = np.where(test_data == 1.00000000000000e+99, np.nan, test_data)
+# Replace missing values with NaN
+training_data = np.where(training_data == 1.00000000000000e+99, np.nan, training_data)
+testing_data = np.where(testing_data == 1.00000000000000e+99, np.nan, testing_data)
 
 # Fill missing values with the median of each column
 imputer = SimpleImputer(strategy='median')
-train_data_imputed = imputer.fit_transform(train_data)
-test_data_imputed = imputer.transform(test_data)
+training_data_imputed = imputer.fit_transform(training_data)
+testing_data_imputed = imputer.transform(testing_data)
 
-# Initialize the Random Forest Classifier with regularization parameters
+
 rf_clf = RandomForestClassifier(
-    n_estimators=75,              # Number of trees
-    random_state=42,               # For reproducibility
-    max_depth=10,                  # Limit tree depth (regularization)
-    min_samples_split=10,           # Minimum samples required to split an internal node
-    min_samples_leaf=2,            # Minimum samples required at a leaf node
+    n_estimators=75,
+    random_state=42,
+    max_depth=10,
+    min_samples_split=10,
+    min_samples_leaf=2,
     max_features='sqrt',
     class_weight='balanced',
     oob_score=True
 )
 
-# Initialize StratifiedKFold for cross-validation
-skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+# Cross validation
+stratified_kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-# Lists to store metrics for each fold
+# Lists to store metrics for different folds
 accuracies = []
 precisions = []
 recalls = []
 f1_scores = []
 
-# Stratified K-Fold Cross Validation
-for train_index, val_index in skf.split(train_data_imputed, train_labels):
-    X_train, X_val = train_data_imputed[train_index], train_data_imputed[val_index]
-    y_train, y_val = train_labels[train_index], train_labels[val_index]
+
+for training_index, val_index in stratified_kf.split(training_data_imputed, training_labels):
+    X_train, X_val = training_data_imputed[training_index], training_data_imputed[val_index]
+    y_train, y_val = training_labels[training_index], training_labels[val_index]
 
     # Fit the model
     rf_clf.fit(X_train, y_train)
@@ -62,27 +62,25 @@ for train_index, val_index in skf.split(train_data_imputed, train_labels):
     recalls.append(recall)
     f1_scores.append(f1)
 
-# Print the evaluation metrics
+# Eval Metrics
 print(f"Stratified K-Fold Cross-Validation Results:")
 print(f"Accuracy: {np.mean(accuracies):.4f} ± {np.std(accuracies):.4f}")
 print(f"Precision: {np.mean(precisions):.4f} ± {np.std(precisions):.4f}")
 print(f"Recall: {np.mean(recalls):.4f} ± {np.std(recalls):.4f}")
 print(f"F1-Score: {np.mean(f1_scores):.4f} ± {np.std(f1_scores):.4f}")
 
-# Fit the model on the entire training data and calculate training accuracy
-rf_clf.fit(train_data_imputed, train_labels)
-train_data_pred = rf_clf.predict(train_data_imputed)
-train_accuracy = accuracy_score(train_labels, train_data_pred)
+# Training accuracy
+rf_clf.fit(training_data_imputed, training_labels)
+training_data_pred = rf_clf.predict(training_data_imputed)
+training_accuracy = accuracy_score(training_labels, training_data_pred)
 
-print(f"Training Accuracy on the entire dataset: {train_accuracy:.4f}")
+print(f"Training Accuracy on the entire dataset: {training_accuracy:.4f}")
 
 # Predict on the test set
-y_test_pred = rf_clf.predict(test_data_imputed)
+y_test_pred = rf_clf.predict(testing_data_imputed)
 
-# Create results folder if it doesn't exist
-os.makedirs('results', exist_ok=True)
 
-# Save the predicted test labels to a file
+# Save the predicted labels
 np.savetxt('results/BriggsClassification5.txt', y_test_pred, fmt='%d')
 
-print("Predicted test labels saved to 'results/BriggsClassification5.txt'")
+
